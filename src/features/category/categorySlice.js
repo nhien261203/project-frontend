@@ -1,8 +1,9 @@
-// 📁 src/features/category/categorySlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import axiosClient from '../../api/axiosClient'
 
-// ========== Async Thunks ==========
+// ==========================
+// Async Thunks
+// ==========================
 
 // Lấy danh sách danh mục
 export const fetchCategories = createAsyncThunk(
@@ -17,7 +18,7 @@ export const fetchCategories = createAsyncThunk(
     }
 )
 
-// Lấy chi tiết theo ID
+// Lấy chi tiết danh mục theo ID
 export const fetchCategoryById = createAsyncThunk(
     'category/fetchById',
     async (id, { rejectWithValue }) => {
@@ -71,22 +72,27 @@ export const deleteCategory = createAsyncThunk(
     }
 )
 
-// ========== Initial State ==========
+// ==========================
+// Initial State
+// ==========================
+
 const initialState = {
     categories: [],
     category: null,
     loading: false,
     success: false,
     errorList: [],
-    filteredTotal: null,
     pagination: {
         total: 0,
-        currentPage: 1,
-        totalPages: 1,
+        current_page: 1,
+        last_page: 1,
     },
 }
 
-// ========== Slice ==========
+// ==========================
+// Slice
+// ==========================
+
 const categorySlice = createSlice({
     name: 'category',
     initialState,
@@ -98,13 +104,10 @@ const categorySlice = createSlice({
         clearCategory: (state) => {
             state.category = null
         },
-        setFilteredTotal: (state, action) => {
-            state.filteredTotal = action.payload
-        },
     },
     extraReducers: (builder) => {
         builder
-            // ===== Fetch all =====
+            // ===== Fetch All =====
             .addCase(fetchCategories.pending, (state) => {
                 state.loading = true
             })
@@ -113,15 +116,15 @@ const categorySlice = createSlice({
                 state.categories = action.payload.data
                 state.pagination = {
                     total: action.payload.pagination.total,
-                    currentPage: action.payload.pagination.current_page,
-                    totalPages: action.payload.pagination.last_page,
+                    current_page: action.payload.pagination.current_page,
+                    last_page: action.payload.pagination.last_page,
                 }
             })
             .addCase(fetchCategories.rejected, (state) => {
                 state.loading = false
             })
 
-            // ===== Fetch by ID =====
+            // ===== Fetch By ID =====
             .addCase(fetchCategoryById.pending, (state) => {
                 state.loading = true
             })
@@ -179,5 +182,5 @@ const categorySlice = createSlice({
     },
 })
 
-export const { resetState, clearCategory, setFilteredTotal } = categorySlice.actions
+export const { resetState, clearCategory } = categorySlice.actions
 export default categorySlice.reducer

@@ -17,7 +17,6 @@ const CategoryList = () => {
     const dispatch = useDispatch()
     const navigate = useNavigate()
     const location = useLocation()
-    const perPage = 8
 
     const { categories, loading, error, success, pagination } = useSelector((state) => state.category)
 
@@ -27,17 +26,17 @@ const CategoryList = () => {
     const [currentPage, setCurrentPage] = useState(queryPage)
     const [search, setSearch] = useState('')
     const [status, setStatus] = useState('')
-    const [filteredTotal, setFilteredTotal] = useState(null)
-
     const [confirmOpen, setConfirmOpen] = useState(false)
     const [selectedId, setSelectedId] = useState(null)
     const [isProcessing, setIsProcessing] = useState(false)
+    const [filteredTotal, setFilteredTotal] = useState(null)
 
     const [localCategories, setLocalCategories] = useState([])
     const firstLoad = useRef(true)
     const prevSearch = useRef('')
     const prevStatus = useRef('')
 
+    // Đồng bộ categories từ store ra local state để xoá mềm
     useEffect(() => {
         setLocalCategories(categories)
     }, [categories])
@@ -77,9 +76,12 @@ const CategoryList = () => {
 
     const debouncedFetch = useCallback(
         debounce((page, keyword, filterStatus) => {
-            dispatch(fetchCategories({ page, perPage, search: keyword, status: filterStatus }))
+            dispatch(fetchCategories({ page, search: keyword, status: filterStatus }))
                 .unwrap()
-                .then((res) => setFilteredTotal(res.pagination?.total || null))
+                .then((res) => {
+                    setFilteredTotal(res.pagination?.total || null)
+                    setCurrentPage(res.pagination?.current_page || page)
+                })
                 .catch(() => setFilteredTotal(null))
         }, 300),
         [dispatch]
@@ -102,25 +104,33 @@ const CategoryList = () => {
 
         setSearchParams({ page: effectivePage })
 
-        if (firstLoad.current) {
-            dispatch(fetchCategories({ page: effectivePage, perPage, search, status }))
+        const doFetch = (page) => {
+            dispatch(fetchCategories({ page, search, status }))
                 .unwrap()
-                .then((res) => setFilteredTotal(res.pagination?.total || null))
+                .then((res) => {
+                    setFilteredTotal(res.pagination?.total || null)
+                    setCurrentPage(res.pagination?.current_page || page)
+                })
+                .catch(() => setFilteredTotal(null))
+        }
+
+        if (firstLoad.current) {
+            doFetch(effectivePage)
             firstLoad.current = false
         } else {
             debouncedFetch(effectivePage, search, status)
         }
 
         return () => debouncedFetch.cancel()
-    }, [currentPage, search, status, location.state, debouncedFetch, dispatch, setSearchParams, perPage])
+    }, [currentPage, search, status, location.state, debouncedFetch, dispatch, setSearchParams])
 
     useEffect(() => {
         if (error) toast.error(error.message || '❌ Lỗi xảy ra!')
         if (success) {
-            dispatch(fetchCategories({ page: currentPage, perPage, search, status }))
+            dispatch(fetchCategories({ page: currentPage, search, status }))
         }
         return () => dispatch(resetState())
-    }, [error, success, dispatch, currentPage, perPage, search, status])
+    }, [error, success, dispatch, currentPage, search, status])
 
     return (
         <div className="p-4 md:p-6 font-sans">
@@ -192,8 +202,8 @@ const CategoryList = () => {
                                     <td className="p-3">
                                         <span
                                             className={`px-2 py-1 rounded text-xs font-semibold ${category.status === 1
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : 'bg-red-100 text-red-700'
+                                                ? 'bg-green-100 text-green-700'
+                                                : 'bg-red-100 text-red-700'
                                                 }`}
                                         >
                                             {category.status === 1 ? 'Hoạt động' : 'Tạm ẩn'}
@@ -253,8 +263,8 @@ const CategoryList = () => {
                             key={page}
                             onClick={() => setCurrentPage(page)}
                             className={`px-3 py-1 rounded ${page === pagination.current_page
-                                    ? 'bg-blue-600 text-white font-semibold'
-                                    : 'bg-gray-100 hover:bg-gray-200'
+                                ? 'bg-blue-600 text-white font-semibold'
+                                : 'bg-gray-100 hover:bg-gray-200'
                                 }`}
                         >
                             {page}
