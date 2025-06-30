@@ -1,3 +1,4 @@
+// src/features/brand/brandSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import axiosClient from '../../api/axiosClient'
 
@@ -15,6 +16,18 @@ export const fetchBrands = createAsyncThunk(
     }
 )
 
+export const fetchBrandById = createAsyncThunk(
+    'brand/fetchById',
+    async (id, { rejectWithValue }) => {
+        try {
+            const res = await axiosClient.get(`/admin/brands/${id}`)
+            return res.data
+        } catch (err) {
+            return rejectWithValue(err.response?.data || { message: 'Không tìm thấy brand' })
+        }
+    }
+)
+
 export const createBrand = createAsyncThunk(
     'brand/create',
     async (formData, { rejectWithValue }) => {
@@ -24,7 +37,10 @@ export const createBrand = createAsyncThunk(
             })
             return res.data
         } catch (err) {
-            return rejectWithValue(err.response?.data || { message: 'Lỗi tạo brand' })
+            const res = err.response?.data
+            return rejectWithValue(
+                res?.errors || [{ field: 'error', message: res?.message || 'Lỗi tạo brand' }]
+            )
         }
     }
 )
@@ -38,7 +54,10 @@ export const updateBrand = createAsyncThunk(
             })
             return res.data
         } catch (err) {
-            return rejectWithValue(err.response?.data || { message: 'Lỗi cập nhật' })
+            const res = err.response?.data
+            return rejectWithValue(
+                res?.errors || [{ field: 'error', message: res?.message || 'Lỗi cập nhật brand' }]
+            )
         }
     }
 )
@@ -55,39 +74,32 @@ export const deleteBrand = createAsyncThunk(
     }
 )
 
-export const fetchBrandById = createAsyncThunk(
-    'brand/fetchById',
-    async (id, { rejectWithValue }) => {
-        try {
-            const res = await axiosClient.get(`/admin/brands/${id}`)
-            return res.data
-        } catch (err) {
-            return rejectWithValue(err.response?.data || { message: 'Không tìm thấy' })
-        }
-    }
-)
-
 // ==== Slice ====
+
+const initialState = {
+    brands: [],
+    brand: null,
+    loading: false,
+    success: false,
+    errorList: [],
+    filteredTotal: null,
+    pagination: {
+        total: 0,
+        currentPage: 1,
+        totalPages: 1,
+    },
+}
 
 const brandSlice = createSlice({
     name: 'brand',
-    initialState: {
-        brands: [],
-        brand: null,
-        loading: false,
-        success: false,
-        error: null,
-        filteredTotal: null, // 👈 thêm state lọc
-        pagination: {
-            total: 0,
-            currentPage: 1,
-            totalPages: 1,
-        },
-    },
+    initialState,
     reducers: {
         resetState: (state) => {
             state.success = false
-            state.error = null
+            state.errorList = []
+        },
+        clearBrand: (state) => {
+            state.brand = null
         },
         setFilteredTotal: (state, action) => {
             state.filteredTotal = action.payload
@@ -95,7 +107,6 @@ const brandSlice = createSlice({
     },
     extraReducers: (builder) => {
         builder
-            // Fetch
             .addCase(fetchBrands.pending, (state) => {
                 state.loading = true
             })
@@ -108,15 +119,26 @@ const brandSlice = createSlice({
                     totalPages: action.payload.totalPages,
                 }
             })
-            .addCase(fetchBrands.rejected, (state, action) => {
+            .addCase(fetchBrands.rejected, (state) => {
                 state.loading = false
-                state.error = action.payload
             })
 
-            // Create
+            .addCase(fetchBrandById.pending, (state) => {
+                state.loading = true
+            })
+            .addCase(fetchBrandById.fulfilled, (state, action) => {
+                state.loading = false
+                state.brand = action.payload
+            })
+            .addCase(fetchBrandById.rejected, (state) => {
+                state.loading = false
+                state.brand = null // ✅ Fix infinite fetch loop
+            })
+
             .addCase(createBrand.pending, (state) => {
                 state.loading = true
                 state.success = false
+                state.errorList = []
             })
             .addCase(createBrand.fulfilled, (state) => {
                 state.loading = false
@@ -124,43 +146,36 @@ const brandSlice = createSlice({
             })
             .addCase(createBrand.rejected, (state, action) => {
                 state.loading = false
-                state.error = action.payload
+                state.errorList = action.payload
             })
 
-            // Update
+            .addCase(updateBrand.pending, (state) => {
+                state.loading = true
+                state.success = false
+                state.errorList = []
+            })
             .addCase(updateBrand.fulfilled, (state) => {
                 state.loading = false
                 state.success = true
             })
             .addCase(updateBrand.rejected, (state, action) => {
                 state.loading = false
-                state.error = action.payload
+                state.errorList = action.payload
             })
 
-            // Delete
+            .addCase(deleteBrand.pending, (state) => {
+                state.loading = true
+                state.success = false
+            })
             .addCase(deleteBrand.fulfilled, (state) => {
                 state.loading = false
                 state.success = true
             })
-            .addCase(deleteBrand.rejected, (state, action) => {
+            .addCase(deleteBrand.rejected, (state) => {
                 state.loading = false
-                state.error = action.payload
-            })
-
-            // Fetch by ID
-            .addCase(fetchBrandById.fulfilled, (state, action) => {
-                state.brand = action.payload
-                state.loading = false
-            })
-            .addCase(fetchBrandById.pending, (state) => {
-                state.loading = true
-            })
-            .addCase(fetchBrandById.rejected, (state, action) => {
-                state.loading = false
-                state.error = action.payload
             })
     },
 })
 
-export const { resetState, setFilteredTotal } = brandSlice.actions
+export const { resetState, clearBrand, setFilteredTotal } = brandSlice.actions
 export default brandSlice.reducer
